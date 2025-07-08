@@ -24,6 +24,8 @@ function preload() {
     this.load.image(`image${i}`, `assets/${i}.jpg`);
   }
   this.load.image('back', 'assets/back.jpg');
+  this.load.audio('match', 'assets/sound_match.mp3');
+  this.load.audio('nomatch', 'assets/sound_nomatch.mp3');
 }
 
 function create() {
@@ -104,6 +106,8 @@ function onCardClicked(card) {
     const second = this.secondCard;
 
     if (first.getData('key') === second.getData('key')) {
+      this.sound.play('match');
+
       // Animate match (e.g. scale down and fade)
       this.tweens.add({
     targets: [first, second],
@@ -139,7 +143,9 @@ function onCardClicked(card) {
         }
       });
     } else {
-      this.time.delayedCall(1000, () => {
+      this.sound.play('nomatch');
+
+      this.time.delayedCall(1500, () => {
         first.setTexture('back').setDisplaySize(cardSize, cardSize).setData('flipped', false);
         second.setTexture('back').setDisplaySize(cardSize, cardSize).setData('flipped', false);
         this.firstCard = this.secondCard = null;
