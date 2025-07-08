@@ -16,7 +16,7 @@ const game = new Phaser.Game(config);
 let gridConfig = {
   cols: 5,
   rows: 4,
-  padding: 20
+  padding: 4
 };
 
 function preload() {
@@ -33,6 +33,17 @@ function create() {
   this.firstCard = null;
   this.secondCard = null;
   this.lockBoard = false;
+
+   // Check if the device is in portrait mode
+  const isPortrait = window.innerHeight > window.innerWidth;
+
+  if (isPortrait) {
+    gridConfig.cols = 3;
+    gridConfig.rows = Math.ceil(20 / 3); // Since you have 20 cards
+  } else {
+    gridConfig.cols = 5;
+    gridConfig.rows = 4;
+  }
 
   const images = [];
   for (let i = 1; i <= 10; i++) {
