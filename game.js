@@ -1,14 +1,23 @@
 const config = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  },
   scene: {
     preload,
-    create
+    create,
+    resize
   }
 };
 
 const game = new Phaser.Game(config);
+
+let gridConfig = {
+  cols: 5,
+  rows: 4,
+  padding: 20
+};
 
 function preload() {
   for (let i = 1; i <= 10; i++) {
@@ -18,63 +27,124 @@ function preload() {
 }
 
 function create() {
+  this.cards = [];
+  this.firstCard = null;
+  this.secondCard = null;
+  this.lockBoard = false;
+
   const images = [];
   for (let i = 1; i <= 10; i++) {
     images.push(`image${i}`, `image${i}`);
   }
 
   Phaser.Utils.Array.Shuffle(images);
+  this.shuffledImages = images;
 
-  const grid = {
-    cols: 5,
-    rows: 4,
-    cardSize: 100,
-    padding: 20
+  // Attach drawGrid to the scene so we can call it as this.drawGrid()
+  this.drawGrid = () => {
+    const { cols, rows, padding } = gridConfig;
+    const totalPaddingX = padding * (cols - 1);
+    const totalPaddingY = padding * (rows - 1);
+    const availableWidth = this.scale.width - totalPaddingX;
+    const availableHeight = this.scale.height - totalPaddingY;
+    const cardSize = Math.floor(Math.min(availableWidth / cols, availableHeight / rows));
+
+    const startX = (this.scale.width - (cols * cardSize + (cols - 1) * padding)) / 2;
+    const startY = (this.scale.height - (rows * cardSize + (rows - 1) * padding)) / 2;
+
+    this.shuffledImages.forEach((key, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = startX + col * (cardSize + padding) + cardSize / 2;
+      const y = startY + row * (cardSize + padding) + cardSize / 2;
+
+      const card = this.add.image(x, y, 'back')
+        .setDisplaySize(cardSize, cardSize)
+        .setOrigin(0.5) 
+        .setInteractive();
+
+      card.setData('key', key);
+      card.setData('flipped', false);
+
+      card.on('pointerdown', () => onCardClicked.call(this, card));
+
+      this.cards.push(card);
+    });
   };
 
-  const startX = (this.scale.width - (grid.cols * (grid.cardSize + grid.padding) - grid.padding)) / 2;
-  const startY = 50;
+  this.drawGrid(); // Now works!
+}
 
-  let firstCard = null;
-  let secondCard = null;
-  let lockBoard = false;
+function resize() {
+  this.scene.restart(); // Force re-layout on resize
+}
 
-  images.forEach((key, i) => {
-    const col = i % grid.cols;
-    const row = Math.floor(i / grid.cols);
-    const x = startX + col * (grid.cardSize + grid.padding);
-    const y = startY + row * (grid.cardSize + grid.padding);
 
-    const card = this.add.image(x, y, 'back').setDisplaySize(grid.cardSize, grid.cardSize).setInteractive();
-    card.setData('key', key);
-    card.setData('flipped', false);
+function onCardClicked(card) {
+  if (this.lockBoard || card.getData('flipped')) return;
 
-    card.on('pointerdown', () => {
-      if (lockBoard || card.getData('flipped')) return;
+  const { cols, rows, padding } = gridConfig;
+  const totalPaddingX = padding * (cols - 1);
+  const totalPaddingY = padding * (rows - 1);
+  const availableWidth = this.scale.width - totalPaddingX;
+  const availableHeight = this.scale.height - totalPaddingY;
+  const cardSize = Math.floor(Math.min(availableWidth / cols, availableHeight / rows));
 
-      card.setTexture(card.getData('key'));
-      card.setData('flipped', true);
+  // Flip to front image and resize
+  card.setTexture(card.getData('key')).setDisplaySize(cardSize, cardSize);
+  card.setData('flipped', true);
 
-      if (!firstCard) {
-        firstCard = card;
-      } else {
-        secondCard = card;
-        lockBoard = true;
+  if (!this.firstCard) {
+    this.firstCard = card;
+  } else {
+    this.secondCard = card;
+    this.lockBoard = true;
 
-        if (firstCard.getData('key') === secondCard.getData('key')) {
-          // Match found
-          firstCard = secondCard = null;
-          lockBoard = false;
-        } else {
-          // Mismatch
-          this.time.delayedCall(1000, () => {
-            firstCard.setTexture('back').setData('flipped', false);
-            secondCard.setTexture('back').setData('flipped', false);
-            firstCard = secondCard = null;
-            lockBoard = false;
-          });
+    const first = this.firstCard;
+    const second = this.secondCard;
+
+    if (first.getData('key') === second.getData('key')) {
+      // Animate match (e.g. scale down and fade)
+      this.tweens.add({
+    targets: [first, second],
+    tint: 0x66ff66, // Softer green
+    tintFill: true, // Allows blending
+    duration: 300,  // Slightly longer to feel smoother
+    yoyo: true,
+    repeat: 2,
+    ease: 'Sine.easeInOut',
+
+        onComplete: () => {
+
+
+
+          this.tweens.add({
+        targets: [first, second],
+        scaleX: 0,
+        scaleY: 0,
+        alpha: 0,
+        angle: 180,
+        duration: 500,
+        ease: 'Power1',
+        onComplete: () => {
+
+          
+
+          first.destroy();
+          second.destroy();
+          this.firstCard = this.secondCard = null;
+          this.lockBoard = false;
         }
-      }
-    });
-  });
+      });
+        }
+      });
+    } else {
+      this.time.delayedCall(1000, () => {
+        first.setTexture('back').setDisplaySize(cardSize, cardSize).setData('flipped', false);
+        second.setTexture('back').setDisplaySize(cardSize, cardSize).setData('flipped', false);
+        this.firstCard = this.secondCard = null;
+        this.lockBoard = false;
+      });
+    }
+  }
 }
